@@ -125,6 +125,21 @@ app.get('/api/servicenow/catalog/items/:itemId', async (req, res) => {
   }
 });
 
+// Get catalog item form (ServiceNow Service Catalog API)
+app.get('/api/sn_sc/servicecatalog/items/:itemId', async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    // Use the ServiceNow Service Catalog API to get item with variables
+    const endpoint = `/api/sn_sc/servicecatalog/items/${itemId}`;
+    
+    const data = await makeServiceNowRequest(endpoint);
+    res.json(data);
+  } catch (error) {
+    console.error('Error fetching catalog item form:', error);
+    res.status(500).json({ error: 'Failed to fetch catalog item form', message: error.message });
+  }
+});
+
 // Get catalog categories
 app.get('/api/servicenow/catalog/categories', async (req, res) => {
   try {

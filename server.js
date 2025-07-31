@@ -125,6 +125,27 @@ app.get('/api/servicenow/catalog/items/:itemId', async (req, res) => {
   }
 });
 
+// Get catalog items (ServiceNow Service Catalog API)
+app.get('/api/servicenow/api/sn_sc/servicecatalog/items', async (req, res) => {
+  try {
+    const { search, category, limit = 10, offset = 0 } = req.query;
+    
+    let queryParams = `sysparm_limit=${limit}`;
+    if (offset) queryParams += `&sysparm_offset=${offset}`;
+    if (search) queryParams += `&sysparm_search=${encodeURIComponent(search)}`;
+    if (category) queryParams += `&sysparm_category=${encodeURIComponent(category)}`;
+    
+    // Use the ServiceNow Service Catalog API to get items with variables
+    const endpoint = `/api/sn_sc/servicecatalog/items?${queryParams}`;
+    
+    const data = await makeServiceNowRequest(endpoint);
+    res.json(data);
+  } catch (error) {
+    console.error('Error fetching catalog items:', error);
+    res.status(500).json({ error: 'Failed to fetch catalog items', message: error.message });
+  }
+});
+
 // Get catalog item form (ServiceNow Service Catalog API)
 app.get('/api/sn_sc/servicecatalog/items/:itemId', async (req, res) => {
   try {
@@ -137,6 +158,21 @@ app.get('/api/sn_sc/servicecatalog/items/:itemId', async (req, res) => {
   } catch (error) {
     console.error('Error fetching catalog item form:', error);
     res.status(500).json({ error: 'Failed to fetch catalog item form', message: error.message });
+  }
+});
+
+// Get catalog item details (ServiceNow Service Catalog API)
+app.get('/api/servicenow/api/sn_sc/servicecatalog/items/:itemId', async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    // Use the ServiceNow Service Catalog API to get item with variables
+    const endpoint = `/api/sn_sc/servicecatalog/items/${itemId}`;
+    
+    const data = await makeServiceNowRequest(endpoint);
+    res.json(data);
+  } catch (error) {
+    console.error('Error fetching catalog item details:', error);
+    res.status(500).json({ error: 'Failed to fetch catalog item details', message: error.message });
   }
 });
 
@@ -221,13 +257,54 @@ app.get('/api/servicenow/requests', async (req, res) => {
   try {
     const { limit = 10, offset = 0 } = req.query;
     
-    const endpoint = `/api/now/table/sc_request?sysparm_limit=${limit}&sysparm_offset=${offset}&sysparm_fields=sys_id,number,short_description,state,opened_at,sys_created_on,requested_for`;
+    const endpoint = `/api/now/table/sc_request?sysparm_limit=${limit}&sysparm_offset=${offset}&sysparm_fields=sys_id,number,short_description,state,opened_at,sys_created_on,requested_for&sysparm_display_value=true`;
     
     const data = await makeServiceNowRequest(endpoint);
     res.json(data);
   } catch (error) {
     console.error('Error fetching user requests:', error);
     res.status(500).json({ error: 'Failed to fetch user requests', message: error.message });
+  }
+});
+
+// Submit catalog request
+app.post('/api/servicenow/requests/submit', async (req, res) => {
+  try {
+    const { catalogItemId, formData, requestNumber } = req.body;
+    
+    // Create the request in ServiceNow
+    const requestData = {
+      cat_item: catalogItemId,
+      quantity: 1,
+      variables: formData,
+      requested_for: 'ext.portal.v2',
+      short_description: `Request for catalog item: ${catalogItemId}`,
+      description: `Request submitted via external portal with form data: ${JSON.stringify(formData)}`
+    };
+    
+    const endpoint = '/api/now/table/sc_req_item';
+    const data = await makeServiceNowRequest(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(requestData)
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        sys_id: data.result.sys_id,
+        number: data.result.number,
+        table: 'sc_req_item',
+        created_at: data.result.sys_created_on
+      },
+      message: 'Request created successfully in ServiceNow'
+    });
+  } catch (error) {
+    console.error('Error submitting catalog request:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to submit catalog request', 
+      message: error.message 
+    });
   }
 });
 
